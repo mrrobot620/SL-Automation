@@ -4,8 +4,8 @@ from selenium.webdriver.common.by import By
 import pandas as pd
 import requests
 import time
-import json
-from functools import lru_cache
+import logging
+
 
 op = webdriver.ChromeOptions()
 prefs = {
@@ -15,16 +15,16 @@ prefs = {
 }
 op.add_experimental_option('prefs', prefs)
 driver = webdriver.Chrome(options=op)
-
 session = requests.Session()
 
-def login_flo(username: str, password: str):
+
+def login_flo(user: str, pasw: str):
     driver.get("http://10.24.1.71/mh-ops")
     time.sleep(5)
     username = driver.find_element(By.XPATH, "/html/body/div[2]/div[2]/div/div/form/div/div[4]/input[1]")
-    username.send_keys(username)
+    username.send_keys(user)
     password = driver.find_element(By.XPATH, "/html/body/div[2]/div[2]/div/div/form/div/div[4]/input[2]")
-    password.send_keys(password)
+    password.send_keys(pasw)
     time.sleep(2)
     try:
         cross = driver.find_element(By.XPATH, "/html/body/div[4]/div/button")
@@ -47,8 +47,19 @@ def login_flo(username: str, password: str):
     session.headers.update({"user-agent": selenium_user_agent})
     for cookie in driver.get_cookies():
         session.cookies.set(cookie['name'], cookie['value'], domain=cookie['domain'])
-
     return None
+
+
+def session_checker() -> bool:
+    try:
+        response = session.get("http://10.24.1.71/mh-ops-routes-api/mh-ops-proxy/v1/track-and-trace-proxy/container/bag1/track" , timeout=1)
+        response.raise_for_status()  # Raise exception for 4xx or 5xx status codes
+        logging.info("API endpoint is reachable. Status code: %d", response.status_code)
+        return True
+    except requests.exceptions.RequestException as e:
+        logging.error("Failed to reach API endpoint: %s", e)
+        return False
+
 
 def bag_retriever() -> list[str]:
     with open('a.txt', 'r') as f:
@@ -66,30 +77,9 @@ def sealID_finder(bags: list[str]):
         seals.append(seal_id)
     return seals
 
-def random_data(seal: str) -> dict[str: str]:
-    api = f"http://10.24.0.157/print/label/{seal}?Entity=BAG"
-    response = session.get(api)
-    data = response.text
-    data1 = data.split("\n")[0]
-    values = data1.split(",")
-    bag_id = values[4]
-    seal_id = values[8]
-    shipments = values[5]
-    casper = values[10]
-    real_casper = casper.split("^")
-    return {
-        'bag_id': bag_id,
-        'seal_id': seal_id,
-        'shipments': shipments,
-        'casper': real_casper[0]
-    }
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+if __name__ == '__main__':
+    if session_checker():
 
 
-if __name__ == "__main__":
-    login_flo("ca.2273429", "xMtapye9CUuw")
-    data_list = []
-    for seal in sealID_finder(bag_retriever()):
-        data_list.append(random_data(seal))
-    df = pd.DataFrame(data_list)
-    df.to_csv("random_data.csv", index=False)
-    df
