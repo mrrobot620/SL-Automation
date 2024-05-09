@@ -103,6 +103,6 @@ import pandas as pd
 
 df =pd.DataFrame(data_list)
 
-df.to_csv("random_data.csv")
+df.to_csv("random_data.csv" , index=False)
 
 df
